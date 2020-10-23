@@ -17,7 +17,7 @@ class App extends Component {
   state = {
     showBackdrop: false,
     showMobileNav: false,
-    isAuth: true,
+    isAuth: false,
     token: null,
     userId: null,
     authLoading: false,
@@ -59,7 +59,15 @@ class App extends Component {
   loginHandler = (event, authData) => {
     event.preventDefault();
     this.setState({ authLoading: true });
-    fetch('URL')
+    const URL = 'http://localhost:8080/auth/login';
+    fetch(URL, { 
+      method: 'POST', 
+      headers: { 'content-type': 'application/json' }, 
+      body: JSON.stringify({
+        email: authData.email,
+        password: authData.password
+      })
+    })
       .then(res => {
         if (res.status === 422) {
           throw new Error('Validation failed.');
@@ -71,7 +79,6 @@ class App extends Component {
         return res.json();
       })
       .then(resData => {
-        console.log(resData);
         this.setState({
           isAuth: true,
           token: resData.token,
@@ -99,8 +106,19 @@ class App extends Component {
 
   signupHandler = (event, authData) => {
     event.preventDefault();
+    const { formIsValid, signupForm } = authData;
+
     this.setState({ authLoading: true });
-    fetch('URL')
+    const URL = 'http://localhost:8080/auth/signup';
+    fetch(URL, { 
+      method: 'POST', 
+      headers: { 'content-type': 'application/json' }, 
+      body: JSON.stringify({
+        email: signupForm.email.value,
+        name: signupForm.name.value,
+        password: signupForm.password.value
+      })
+    })
       .then(res => {
         if (res.status === 422) {
           throw new Error(

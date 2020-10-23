@@ -59,7 +59,7 @@ class FeedEdit extends Component {
           valid: true
         }
       };
-      this.setState({ postForm: postForm, formIsValid: true });
+      this.setState({ postForm: postForm, formIsValid: true, imagePreview: `http://localhost:8080/${this.props.selectedPost.imagePath}`, });
     }
   }
 
