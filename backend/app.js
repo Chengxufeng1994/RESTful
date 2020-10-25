@@ -8,6 +8,7 @@ const { uuidv4 } = require('uuid');
 
 const FeedRoutes = require('./routes/feed');
 const AuthRoutes = require('./routes/auth');
+const socket = require('./socket');
 
 const app = express();
 
@@ -65,8 +66,13 @@ app.use((error, req, res, next) => {
 // connect to MongoDB
 mongoose.connect(URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then((response) => {
-    app.listen(PORT, localhost, function () {
+    const server = app.listen(PORT, localhost, function () {
       console.log(`Server running at http://127.0.0.1:${PORT}/`);
+    });
+    const io = require('./socket').init(server);
+
+    io.on('connection', (socket) => {
+      console.log('Client connected');
     });
   })
   .catch((error) => {
