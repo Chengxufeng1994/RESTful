@@ -58,35 +58,45 @@ class App extends Component {
 
   loginHandler = (event, authData) => {
     event.preventDefault();
+    const graphqlQuery = {
+      query: `
+        {
+          login(loginInput: { email: "${authData.email}", password: "${authData.password}"}) {
+            userId
+            token
+          }
+        }
+      `
+    }
     this.setState({ authLoading: true });
-    const URL = 'http://localhost:8080/auth/login';
+    const URL = 'http://localhost:8080/graphql';
     fetch(URL, { 
       method: 'POST', 
       headers: { 'content-type': 'application/json' }, 
-      body: JSON.stringify({
-        email: authData.email,
-        password: authData.password
-      })
+      body: JSON.stringify(graphqlQuery)
     })
       .then(res => {
-        if (res.status === 422) {
-          throw new Error('Validation failed.');
-        }
-        if (res.status !== 200 && res.status !== 201) {
-          console.log('Error!');
-          throw new Error('Could not authenticate you!');
-        }
         return res.json();
       })
       .then(resData => {
+        console.log('[login Handler]: ', resData);
+        if (resData.errors && resData.errors[0].status === 422) {
+          const error = new Error('Validation failed.')
+          throw error
+        }
+        if (resData.errors && resData.errors[0].status !== 200 && resData.errors[0].status !== 201) {
+          const error = new Error('Could not authenticate you!')
+          throw error;
+        }
+
         this.setState({
           isAuth: true,
-          token: resData.token,
+          token: resData.data.login.token,
           authLoading: false,
-          userId: resData.userId
+          userId: resData.data.login.userId
         });
-        localStorage.setItem('token', resData.token);
-        localStorage.setItem('userId', resData.userId);
+        localStorage.setItem('token', resData.data.login.token);
+        localStorage.setItem('userId', resData.data.login.userId);
         const remainingMilliseconds = 60 * 60 * 1000;
         const expiryDate = new Date(
           new Date().getTime() + remainingMilliseconds
@@ -106,33 +116,43 @@ class App extends Component {
 
   signupHandler = (event, authData) => {
     event.preventDefault();
-    const { formIsValid, signupForm } = authData;
+    const { signupForm } = authData;
+    const graphqlQuery = {
+      query: `
+        mutation {
+          createUser(userInput: { 
+            name: "${signupForm.name.value}", 
+            email: "${signupForm.email.value}",
+            password: "${signupForm.password.value}"
+          }) {
+            _id
+            email
+          }
+        }
+      `
+    };
 
     this.setState({ authLoading: true });
-    const URL = 'http://localhost:8080/auth/signup';
-    fetch(URL, { 
-      method: 'POST', 
-      headers: { 'content-type': 'application/json' }, 
-      body: JSON.stringify({
-        email: signupForm.email.value,
-        name: signupForm.name.value,
-        password: signupForm.password.value
-      })
+    const URL = 'http://localhost:8080/graphql';
+    fetch(URL, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+      }, 
+      body: JSON.stringify(graphqlQuery)
     })
       .then(res => {
-        if (res.status === 422) {
-          throw new Error(
-            "Validation failed. Make sure the email address isn't used yet!"
-          );
-        }
-        if (res.status !== 200 && res.status !== 201) {
-          console.log('Error!');
-          throw new Error('Creating a user failed!');
-        }
         return res.json();
       })
       .then(resData => {
-        console.log(resData);
+        console.log('[Signup Handler]', resData);
+        if (resData.errors && resData.errors[0] && resData.errors.status === 422) {
+          throw new Error('Validation failed. Make sure the email address isn\'t used yet!');
+        }
+        if (resData.errors) {
+          throw new Error('User created Failed!');
+        }
+
         this.setState({ isAuth: false, authLoading: false });
         this.props.history.replace('/');
       })

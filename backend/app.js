@@ -1,14 +1,19 @@
+const fs = require('fs');
 const path = require('path');
 
 const express = require('express');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const multer = require('multer');
-const { uuidv4 } = require('uuid');
+const{ graphqlHTTP } = require('express-graphql');
 
-const FeedRoutes = require('./routes/feed');
-const AuthRoutes = require('./routes/auth');
-const socket = require('./socket');
+const schema = require('./graphql/schema');
+const resolvers = require('./graphql/resolvers');
+// middleware
+const isAuth = require('./middleware/isAuth');
+// utils
+const { clearImage } = require('./utils/index')
 
 const app = express();
 
@@ -38,19 +43,55 @@ const fileFilter = function (req, file, cb) {
 const fileUpload = multer({ storage: fileStorage, fileFilter: fileFilter }).single('image');
 // app.use(bodyParser.urlencoded({ extended: false }));  // x-www-form-urlencoded <form>
 app.use(bodyParser.json()); // application/json
+app.use(cors());
 // express/multer
 app.use(fileUpload);
 // 在 Express 中提供靜態檔案，指定路徑/images
 app.use('/images', express.static(path.join(__dirname, 'images')));
-
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods','GET, POST, PUT, PATCH, DELETE');
+  res.setHeader('Access-Control-Allow-Methods','OPTIONS, GET, POST, PUT, PATCH, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.statusCode(200);
+  }
   next();
 });
-app.use('/feed', FeedRoutes);
-app.use('/auth', AuthRoutes);
+app.use(isAuth);
+app.put('/post-image',(req, res, next) => {
+  console.log('[PUT /post-image]')
+  if(!req.isAuth) {
+    throw new Error('No authenticated!')
+  }
+  if(!req.file) {
+    return res.status(200).json({ message: "No file provided!" });
+  }
+  if (req.body.oldPath) {
+    clearImage(req.body.oldPath);
+  }
+  return res.status(200).json({ message: "File storged", filePath: req.file.path });
+});
+app.use('/graphql', graphqlHTTP({
+  schema: schema,
+  rootValue: resolvers,
+  graphiql: true,
+  customFormatErrorFn: (error) => {
+    if(!error.originalError) {
+      return error;
+    }
+
+    const code = error.originalError.code || 500;
+    const data = error.originalError.data;
+    const message = error.message || 'An error occurred';
+
+    return {
+      status: code,
+      data: data, 
+      message: message,
+    }
+  }
+}));
 // Error Handling
 app.use((error, req, res, next) => {
   console.log('[Error Handling]', error);
@@ -66,13 +107,8 @@ app.use((error, req, res, next) => {
 // connect to MongoDB
 mongoose.connect(URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then((response) => {
-    const server = app.listen(PORT, localhost, function () {
+    app.listen(PORT, localhost, function () {
       console.log(`Server running at http://127.0.0.1:${PORT}/`);
-    });
-    const io = require('./socket').init(server);
-
-    io.on('connection', (socket) => {
-      console.log('Client connected');
     });
   })
   .catch((error) => {
