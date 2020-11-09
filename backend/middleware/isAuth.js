@@ -7,7 +7,7 @@ module.exports = (req, res, next) => {
     return next();
   }
 
-  const token = req.header('Authorization').replace('Bearer', '');
+  const token = authHeader.replace('Bearer', '');
   let decodedToken;
 
   try {
